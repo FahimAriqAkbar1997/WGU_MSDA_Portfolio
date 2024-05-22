@@ -1,0 +1,205 @@
+~~Full Code used for D213 Task 1 Submission~~
+
+#import packages needed for performing time series
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+import seaborn as sns
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error
+from statsmodels.tsa.stattools import adfuller
+from statsmodels.tsa.seasonal import seasonal_decompose
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+from statsmodels.tsa.arima.model import ARIMA
+#import dataset used for the analysis
+df = pd.read_csv (r'C:\Users\fahim\Documents\0_WGUDocuments\d213\medical_time_series.csv')
+# Check data types and number of values, as well as overall size of dataframe
+df.info()
+
+# Visually inspect dataframe and see if there are any issues
+pd.set_option("display.max_columns", None)
+df
+
+# In the dataframe, 'Day' doesn't tell us the start and end date, and 'Revenue' doesn't specify currency
+# For this analysis, we will assign start date, in datetime format
+start_date = pd.to_datetime('2008-01-01')
+# Convert Day column to differences in time
+df['Day'] = pd.to_timedelta(df['Day']-1, unit='D') + start_date
+# Rename columns
+df.columns = ['date', 'revenue']
+# Set the index for the 'date' column
+df.set_index('date', inplace=True)
+# View the dataframe to verify that all of the changes have been made
+df
+
+# Plot a line graph visualizing the realization of the time series
+plt.figure(figsize = [16,5])
+plt.title("Hospital Daily Revenue, 2008 - 2009")
+plt.xlabel("Date")
+plt.ylabel("Daily Revenue (in Millions USD")
+# Plot time series data
+plt.plot(df)
+# Generate trend line
+x = mdates.date2num(df.index)
+y = df.revenue
+z = np.polyfit(x, y, 1)
+p = np.poly1d(z)
+# Plot trendline
+plt.plot(x, p(x), "r--")
+plt.show()
+
+# Perform Augmented Dicky-Fuller on the data to test if it is stationary
+df_trans = df.diff().dropna()
+adfuller_results = adfuller(df_trans.revenue)
+# Print resulting test-statistic and p-value
+print(f"Resulting Test statistic of an augmented Dicky-Fuller test on the data is {round(adfuller_results[0], 4)}, with a p-value of {round(adfuller_results[1], 8)}")
+# Plot to verify stationarity
+df_trans.plot();
+
+# Split time series into a training set and a test set
+train, test = train_test_split(df_trans, test_size=0.2, shuffle=False, random_state=369)
+train
+
+test
+
+# Now that the data has been split, provide a copy of the training and testing data sets.
+# Save dataframe as CSV
+train.to_csv('D213Task1_train_clean.csv')
+# Save dataframe as CSV
+test.to_csv('D213Task1_test_clean.csv')
+
+# Decompose the transformed data to showcase seasonality of the data
+decomposed_data = seasonal_decompose(df_trans)
+# Long X and small Y dictate a wide graph figure
+plt.figure(figsize = [16,5])
+# Plot seasonal component of the data
+plt.plot(decomposed_data.seasonal);
+
+# Further showcase seasonality by plotting a month in the middle of the dataset for closer analysis and visualizations
+# Long X and small Y dictate a wide graph figure
+plt.figure(figsize = [16,5])
+# Plot a seasonal component of the data
+plt.plot(decomposed_data.seasonal, marker='o')
+plt.xlim(pd.to_datetime('2009-01-01'), pd.to_datetime('2009-02-01'))
+# Use red lines for Mondays
+plt.axvline(x=pd.to_datetime('2009-01-05'), color='red')
+plt.axvline(x=pd.to_datetime('2009-01-12'), color='red')
+plt.axvline(x=pd.to_datetime('2009-01-19'), color='red')
+plt.axvline(x=pd.to_datetime('2009-01-26'), color='red');
+
+# Observe trend of the data
+# Long X and small Y dictate a wide graph figure
+plt.figure(figsize = [16,5])
+# Plot trend component of the data
+plt.plot(decomposed_data.trend);
+
+# Create and compare an Autocorrelation and Partial Autocorrelation plot, sharing a y axis
+# We can use these plots to determine if the data is better suited for an AR (autoregression) or MA (moving average) model
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=[16,5], sharey=True)
+# Plot ACF to 8 lags (only 7 days in a week), ignore zero (zero always = 1)
+plot_acf(df_trans, lags=8, zero=False, ax=ax1)
+# Plot PACF to 8 lags (only 7 days in a week), ignore zero (zero always = 1)
+plot_pacf(df_trans, lags=8, zero=False,ax=ax2)
+# Zoom in on y axis to see the points better
+plt.ylim(-0.6, 0.6);
+
+# Plot and observe spectral density of the data
+plt.psd(x=df_trans.revenue);
+
+# Plot and observe the decomposed time series data plot
+decomposed_data.plot()
+
+# Confirmed Lack of Trends in Residuals of Decomposition
+# Long X and small Y dictate a wide graph figure
+plt.figure(figsize = [16,5])
+# Plot residual component of the data
+plt.plot(decomposed_data.resid);
+
+#Now that all the prelimnary observations have been made, generate an ARIMA Model of Time Series Data
+model = ARIMA(train, order=(1, 0, 0), freq='D')
+results = model.fit()
+print(results.summary())
+
+#Using the derived ARIMA model, perform a forcast
+forecasted = results.get_prediction(start = 584, end = 729, dynamic = True)
+plt.plot(test)
+plt.plot(forecasted.predicted_mean);
+
+print(forecasted.predicted_mean)
+
+# Place the forecasted differences into a temporary dataframe
+forecast_temp = pd.DataFrame(forecasted.predicted_mean)
+# Assign the appropriate names for dataframe
+forecast_temp.rename(columns={'predicted_mean' : 'revenue'}, inplace=True)
+# Link together a copy of Train (through Aug 07 2009) and a copy of forecasted values (forward from Aug 08 2009)
+df_w_forecast = pd.concat([train.copy(), forecast_temp.copy()])
+# Now that we have one DF with the differences in daily revenue for the 2-year period, invert the differences using cumsum
+df_w_forecast = df_w_forecast.cumsum()
+# Check output to verify that we have the expected values 
+df_w_forecast
+
+# Calculate confidence intervals from forecasted data
+confidence_intervals = forecasted.conf_int()
+# Like the forecast, these confidence limits are also differences in daily revenue, these need transformed back to daily revenue
+confidence_intervals
+
+# Establish a dataframe to match the confidence intervals dataframe, including the untransformed data from 2009-08-07
+previous_row = pd.DataFrame({'lower revenue': [19.312734], 'upper revenue' : [19.312734], 'date' : ['2009-08-07']})
+# Convert given date string to datetime and then set as index
+previous_row['date'] = pd.to_datetime(previous_row['date'])
+previous_row.set_index('date', inplace=True)
+previous_row
+
+# Combine the prior row and the confidence intervals data
+confidence_intervals = pd.concat([previous_row, confidence_intervals])
+# Un-transform the confidence intervals using cumsum()
+confidence_intervals = confidence_intervals.cumsum()
+# Make sure first row of data preceding the forecast is omitted
+confidence_intervals = confidence_intervals.loc['2009-08-08' : '2009-12-31']
+# Verify un-transformed confidence intervals
+confidence_intervals
+
+# Long X and small Y dictate a wide graph figure
+plt.figure(figsize = [16,5])
+# Modify the graph for better visual clarity and appearance
+plt.title("Hospital Daily Revenue, 2008 - 2009")
+plt.xlabel("Date")
+plt.ylabel("Daily Revenue (in Millions USD")
+# Plot the forecasted data
+plt.plot(df_w_forecast, color = 'green', linestyle = 'dashed')
+# Plot the original data, which will include both the train set and the test set, untransformed
+plt.plot(df, color = 'blue')
+# Plot the confidence intervals
+plt.fill_between(confidence_intervals.index, confidence_intervals['lower revenue'], confidence_intervals['upper revenue'], color = 'pink')
+# Keep the y-axis zoomed in, without expanding to fit the full confidence interval values
+plt.ylim(-7, 27)
+# Provide a legend for visually distinguishing predicted values from observed values
+plt.legend(['Predicted', 'Observed'])
+plt.show();
+
+# Calculate root mean squared error of forecasted data against the observed data (both untransformed)
+rmse = mean_squared_error(df.loc['2009-08-08' : '2009-12-31'], df_w_forecast.revenue.loc['2009-08-08' : '2009-12-31'], squared=False)
+print(f"The root mean squared error of this forecasting model is {round(rmse, 5)}")
+
+# Showcase Diagnostic Plots
+plt.figure(figsize = [16,16])
+results.plot_diagnostics();
+
+# Long X and small Y dictate a wide graph figure
+plt.figure(figsize = [16,5])
+# Modify the graph for better visual clarity and appearance
+plt.title("Hospital Daily Revenue, 2008 - 2009")
+plt.xlabel("Date")
+plt.ylabel("Daily Revenue (in Millions USD")
+# Plot the forecasted data
+plt.plot(df_w_forecast, color = 'green', linestyle = 'dashed')
+# Plot the original data, which will include both the train set and the test set, untransformed
+plt.plot(df, color = 'blue')
+# Plot the confidence intervals
+plt.fill_between(confidence_intervals.index, confidence_intervals['lower revenue'], confidence_intervals['upper revenue'], color = 'pink')
+# Keep the y-axis zoomed in, without expanding to fit the full confidence interval values
+plt.ylim(-7, 27)
+# Provide a legend for visually distinguishing predicted values from observed values
+plt.legend(['Predicted', 'Observed'])
+plt.show();
