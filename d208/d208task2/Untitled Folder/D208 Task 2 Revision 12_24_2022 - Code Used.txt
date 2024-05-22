@@ -1,0 +1,237 @@
+~~Full Code used for D209 Task 2 Submission~~
+
+~~DATA CLEANING AND PREPARATION CODE~~
+# import packages that will be used for the logistics regression analysis
+import pylab
+import seaborn as sb
+sb.set(style="white")
+sb.set(style="whitegrid", color_codes=True)
+import sklearn
+from sklearn.metrics import confusion_matrix
+from sklearn import preprocessing
+from sklearn.decomposition import PCA
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_curve
+from sklearn.metrics import classification_report
+from sklearn import metrics
+import matplotlib.pyplot as plt
+plt.rc("font", size=14)
+import numpy as np
+import scipy.stats as stats
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
+from IPython.core.display import HTML
+from IPython.display import display
+import pandas as pd
+from pandas import Series, DataFrame
+from sklearn.metrics import classification_report, confusion_matrix
+from imblearn.over_sampling import SMOTE
+
+# import data set that will be used for the logistics regression analysis
+pd.set_option('display.max_columns', None)
+df = pd.read_csv (r'C:\Users\fahim\Documents\0_WGUDocuments\d208\1medical_clean.csv')
+
+# rename the item columns accordingly
+df.rename(columns={'Item1':'Timely_admis','Item2':'Timely_treat',
+ 'Item3':'Timely_visits','Item4':'Reliability',
+ 'Item5':'Options','Item6':'Hrs_treat',
+ 'Item7':'Courteous','Item8':'Active_listen'},inplace=True)
+df.head()
+df.info()
+
+# drop all the demographic columns we don't need for this logistics regression analysis
+df.drop(['City','State','County','Area','Zip','Lat','Lng','Population','TimeZone','Additional_charges','TotalCharge','Interaction','UID','Customer_id','Job','CaseOrder'],axis = 1,inplace=True)
+# verify that all the columns were dropped before proceeding
+df.info()
+
+#check if there is any duplicate data entries present in columns
+df[df.duplicated()]
+
+# check if there are any duplicated columns in the data set - if there are none then the output should be False
+df.columns.duplicated().any()
+
+# check if there are any duplicated rows in the data set - if there are none then the output should be False
+df.duplicated().any()
+
+# convert categorical yes/no values to numeric 1/0 values
+df = df.replace(to_replace = ['Yes','No'],value = [1,0])
+df
+
+# convert the non-married Marital status values to "Married/Not Married", then convert "Married/Not Married" to "1/0"
+#this will make the Marital variable easier to work with during regression analysis
+df['Marital'] = df['Marital'].replace(['Divorced','Widowed','Separated','Never Married'],'Not Married')
+df['Marital'] = df['Marital'].replace(['Married','Not Married'],[1,0])
+df
+
+# Showcase the unique values for the Services variable
+df['Gender'].unique()
+
+#convert the non-Female gender values to "Female/non-female", then convert "Female/non-female" to "1/0"
+df['Gender'] = df['Gender'].replace(['Male','Nonbinary'],'non-female')
+df['Gender'] = df['Gender'].replace(['Female','non-female'],[1,0])
+df
+
+# Showcase the unique values for the Services variable
+df['Services'].unique()
+
+# Drop the services variable since these values cannot be condensed
+df.drop(['Services'],axis = 1,inplace=True)
+
+# Showcase the unique values for the Complication_risk variable
+df['Complication_risk'].unique()
+
+# Drop the services variable since these values cannot be condensed
+df.drop(['Complication_risk'],axis = 1,inplace=True)
+
+# Showcase the unique values for the Initial_admin variable
+df['Initial_admin'].unique()
+
+# convert the non-emergency admission status values to "Emergency Admission/non-Emergency Admission", then convert "Emergency Admission/non-Emergency Admission" to "1/0"
+#this will make the Marital variable easier to work with during regression analysis
+df['Initial_admin'] = df['Initial_admin'].replace(['Elective Admission','Observation Admission'],'non-Emergency Admission')
+df['Initial_admin'] = df['Initial_admin'].replace(['Emergency Admission','non-Emergency Admission'],[1,0])
+df
+
+# describe the dataframe and showcase summary statistics of the variables
+df.describe()
+
+# now that all the modifications have been made, export the prepared dataset
+df.to_csv(r'C:\Users\fahim\Documents\0_WGUDocuments\d208\2medical_clean-PREPAREDTASK2_12-24-2022.csv')
+
+
+~~CODE USED FOR CREATING UNIVARIATE AND BIVARIATE VISUALIZATIONS~~
+
+# Start to visualize the data, including univariate and bivariate analyses
+# begin by visualizing the target variable, ReAdmis
+print(df['ReAdmis'].value_counts())
+sb.countplot(x='ReAdmis', data=df, palette='hls')
+plt.show()
+
+# identify the columns for variables
+Variables = df.select_dtypes(include = "number").columns
+print (Variables)
+
+# create histogram plots of the identified predictor variables
+fig = plt.figure(figsize=(15, 15))
+ax = df[Variables].hist(bins = 15, figsize=(15,15))
+plt.title('Variables')
+fig.tight_layout(h_pad=5, w_pad=5)
+plt.show()
+
+#selecting the target varialbe and showcasing the bivariate statistics
+
+X=df.drop('ReAdmis',inplace=False, axis=1)
+y=df['ReAdmis']
+
+for column in X.columns:
+    plt.scatter(X[column],y)
+    plt.xlabel(column)
+    plt.ylabel('ReAdmis')
+    plt.show()
+
+~~CODE USED FOR THE INITIAL MODEL AND ANALYSIS OF THE INITIAL MODEL~~
+# create the initial logistics model
+log_reg_results = sm.Logit(df["ReAdmis"], df[['Children', 'Age', 'Income', 'Marital', 'Gender', 'VitD_levels', 'Doc_visits', 'Full_meals_eaten', 'vitD_supp','Soft_drink', 'Initial_admin', 'HighBlood', 'Stroke', 'Overweight','Arthritis', 'Diabetes', 'Hyperlipidemia', 'BackPain', 'Anxiety','Allergic_rhinitis', 'Reflux_esophagitis', 'Asthma', 'Initial_days','Timely_admis', 'Timely_treat', 'Timely_visits', 'Reliability','Options', 'Hrs_treat', 'Courteous', 'Active_listen']]).fit()
+print(log_reg_results.summary())
+
+# create the correlation matrix
+matrix_df = pd.read_csv(r'C:\Users\fahim\Documents\0_WGUDocuments\d208\2medical_clean-PREPAREDTASK2_12-24-2022.csv')
+
+matrix_df = matrix_df[['Children', 'Age', 'Income', 'Marital', 'Gender', 'VitD_levels', 'Doc_visits', 'Full_meals_eaten', 'vitD_supp','Soft_drink', 'Initial_admin', 'HighBlood', 'Stroke', 'Overweight','Arthritis', 'Diabetes', 'Hyperlipidemia', 'BackPain', 'Anxiety','Allergic_rhinitis', 'Reflux_esophagitis', 'Asthma', 'Initial_days','Timely_admis', 'Timely_treat', 'Timely_visits', 'Reliability','Options', 'Hrs_treat', 'Courteous', 'Active_listen','ReAdmis']]
+
+X = matrix_df.iloc[:, 1:-1].values
+y = matrix_df.iloc[:,-1].values
+
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.2, random_state = 0)
+
+from sklearn.linear_model import LogisticRegression
+classifier = LogisticRegression(random_state = 0)
+classifier.fit(X_train, y_train)
+
+y_pred = classifier.predict(X_test)
+
+#now create the confusion matrix for the initial model
+from sklearn.metrics import confusion_matrix
+matrix = confusion_matrix(y_test, y_pred)
+print(matrix)
+
+#retrieve the classificaiton report for the initial model
+from sklearn.metrics import classification_report
+print(classification_report(y_test, y_predict_test))
+
+
+~~CODE USED FOR THE REDUCED MODEL AND ANALYSIS OF THE REDUCED MODEL~~
+
+#Create the reduced model with the variables that had a P value below .05 statistical significance level
+log_reg_results2 = sm.Logit(df["ReAdmis"], df[['Age', 'Income', 'Gender', 'VitD_levels', 'Doc_visits', 'vitD_supp','Initial_admin', 'Overweight','Arthritis', 'Anxiety','Allergic_rhinitis', 'Reflux_esophagitis', 'Asthma', 'Initial_days','Timely_admis', 'Timely_visits', 'Reliability','Options', 'Hrs_treat', 'Courteous', 'Active_listen']]).fit()
+print(log_reg_results2.summary())
+
+# create the correlation matrix for the reduced model
+matrix_df = pd.read_csv(r'C:\Users\fahim\Documents\0_WGUDocuments\d208\2medical_clean-PREPAREDTASK2_12-24-2022.csv')
+
+matrix_df = matrix_df[['Age', 'Income', 'Gender', 'VitD_levels', 'Doc_visits', 'vitD_supp','Initial_admin', 'Overweight','Arthritis', 'Anxiety','Allergic_rhinitis', 'Reflux_esophagitis', 'Asthma', 'Initial_days','Timely_admis', 'Timely_visits', 'Reliability','Options', 'Hrs_treat', 'Courteous', 'Active_listen','ReAdmis']]
+
+X = matrix_df.iloc[:, 1:-1].values
+y = matrix_df.iloc[:,-1].values
+
+
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.2, random_state = 0)
+
+from sklearn.linear_model import LogisticRegression
+classifier = LogisticRegression(random_state = 0)
+classifier.fit(X_train, y_train)
+
+y_pred = classifier.predict(X_test)
+
+#now create the confusion matrix for the reduced model
+from sklearn.metrics import confusion_matrix
+matrix = confusion_matrix(y_test, y_pred)
+print(matrix)
+
+y_predict_test = classifier.predict(X_test)
+new_matrix = confusion_matrix(y_test, y_predict_test)
+sb.heatmap(new_matrix, annot=True)
+
+#retrieve the classificaiton report for the reduced model
+from sklearn.metrics import classification_report
+print(classification_report(y_test, y_predict_test))
+
+~~CODE USED FOR THE LOGISTICS REGRESSION EQUATION~~
+# plot ROC Curve
+logit_roc_auc = roc_auc_score(y_test, classifier.predict(X_test))
+fpr, tpr, thresholds = roc_curve(y_test, classifier.predict_proba(X_test)[:,1])
+plt.figure()
+plt.plot(fpr, tpr, label='Logistic Regression (area = %0.2f)' %logit_roc_auc)
+plt.plot([0, 1], [0, 1],'r--')
+plt.xlim([0.0, 1.0])
+plt.ylim([0.0, 1.05])
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('Receiver operating characteristic')
+plt.legend(loc="lower right")
+plt.savefig('Log_ROC')
+plt.show()
+
+# create an equation of the regression
+print('Logit: {:.2f}'.format(logit_roc_auc))
+equation = log_reg_results2.summary().tables[1]
+print('Estimate [{}] as L = '.format(log_reg_results2.summary().tables[0][1][1]))
+equation = pd.DataFrame(equation)
+for i in equation.itertuples():
+    print(' {:+.3f} x ( {} ) '.format(i[0],i[1]))
+
+print(equation)
+
+updated_equation = equation.drop(0)
+
+print(updated_equation)
+
+# create an equation of the logistics regression
+print('Logit: {:.2f}'.format(logit_roc_auc))
+print('Estimate [{}] as L = '.format(log_reg_results2.summary().tables[0][1][1]))
+for i in updated_equation.itertuples():
+    print(' {:+.3f} x ( {} ) '.format(float(str(i[2])),i[1]))

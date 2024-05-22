@@ -1,0 +1,198 @@
+~~PART 1~~
+
+# import packages that will be used for the logistics regression analysis
+import pylab
+import seaborn as sb
+sb.set(style="white")
+sb.set(style="whitegrid", color_codes=True)
+import sklearn
+from sklearn.metrics import confusion_matrix
+from sklearn import preprocessing
+from sklearn.decomposition import PCA
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_curve
+from sklearn.metrics import classification_report
+from sklearn import metrics
+import matplotlib.pyplot as plt
+plt.rc("font", size=14)
+import numpy as np
+import scipy.stats as stats
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
+from IPython.core.display import HTML
+from IPython.display import display
+import pandas as pd
+from pandas import Series, DataFrame
+from sklearn.metrics import classification_report, confusion_matrix
+from imblearn.over_sampling import SMOTE
+
+# import data set that will be used for the logistics regression analysis
+pd.set_option('display.max_columns', None)
+df = pd.read_csv (r'C:\Users\fahim\Documents\0_WGUDocuments\d208\1medical_clean.csv')
+
+# check if there is any missing data entries. Output should be false.
+df.isna().any()
+
+# drop all the columns we don't need for this logistics analysis
+df.drop(['Item8','Item7','Item6','Item5','Item4','Item3','Item2','Item1', 'CaseOrder','Customer_id','Interaction','UID','City','State','County','Zip','Lat','Lng','Population','Area','TimeZone','Job', ],axis = 1,inplace=True)
+# verify that all the columns were dropped before proceeding
+df.head()
+
+df.describe()
+
+#Create dummies for Gender and the target variable 
+df['gender_dummy'] = [1 if v == 'Female' else 0 for v in df['Gender']]
+df['ReAdmis_dummy'] = [1 if v == 'Yes' else 0 for v in df['ReAdmis']]
+
+# convert categorical yes/no values to numeric 1/0 values
+df = df.replace(to_replace = ['Yes','No'],value = [1,0])
+df
+
+# move the chosen target variable "ReAdmis" to beginning of the columns
+df=df[['ReAdmis', 'Initial_days','Children', 'Age', 'Income', 'Marital', 'Gender', 'VitD_levels', 'Doc_visits', 'Full_meals_eaten', 'vitD_supp', 'Soft_drink', 'Initial_admin', 'HighBlood', 'Stroke', 'Complication_risk', 'Overweight', 'Arthritis', 'Diabetes', 'Hyperlipidemia', 'BackPain', 'Anxiety', 'Allergic_rhinitis', 'Reflux_esophagitis', 'Asthma', 'Services', 'TotalCharge', 'Additional_charges']]
+# Confirm that the target variable was moved before exporting the prepared dataset
+my_list = df.columns.values.tolist()
+print(my_list)
+# describe the dataframe to identify distribution of variables
+df.describe()
+
+# now that all the modifications have been made, export the prepared dataset
+df.to_csv(r'C:\Users\fahim\Documents\0_WGUDocuments\d208\2medical_clean-PREPAREDTASK2_.csv')
+
+~~PART 2~~
+
+# identify the columns for numerical data
+NumericalData = df.select_dtypes(include = "number").columns
+print (NumericalData)
+
+# print the columns for categorical data
+CategoricalData = df.select_dtypes(include = "object").columns
+print(CategoricalData)
+
+# Callout the target variable "ReAdmis" and describe it's characteristics
+target = 'ReAdmis'
+for idx, c in enumerate(df.loc[:, df.columns == target]):
+     if df.dtypes[c] == "object":
+             print('\n{}. {} is categorical: {}.'.format(idx+1,c,df[c].unique()))
+for idx,name in enumerate(df[c].value_counts().index.tolist()):
+    print('\t{:<8}:{:>6}'.format(name,df[c].value_counts()[idx]))
+    print('\n{}. {} is numerical.'.format(idx+1, c))
+
+# data cleaning is complete and parameters have been set, and we can now proceed to the analysis
+
+# begin visuallizing the data and include the univariate and bivariate analyses
+print(df[target].value_counts())
+sb.countplot(x=target, data=df, palette='hls')
+plt.show()
+
+# visualize the categorical data and include the univariate and bivariate analyses
+fig = plt.figure(figsize=(10, 20))
+for i, col in enumerate(CategoricalData):
+    if col != target:
+        plt.subplot(10, 3, i+1)
+        ax = sb.countplot(y=col, data=df)
+        fig.tight_layout(h_pad=4, w_pad=4)
+plt.title('Categorical Data')
+plt.show()
+
+# Compare the target variable "ReAdmis" to ALL of the categorical variables
+tbl = pd.pivot_table(df.groupby(['Marital','ReAdmis']).size().reset_index(),
+values=0,
+index='Marital',
+columns=['ReAdmis'],
+aggfunc=np.sum)
+tbl.plot(kind='bar',stacked=True)
+tbl = pd.pivot_table(df.groupby(['Gender','ReAdmis']).size().reset_index(),
+values=0,
+index='Gender',
+columns=['ReAdmis'],
+aggfunc=np.sum)
+tbl.plot(kind='bar',stacked=True)
+tbl = pd.pivot_table(df.groupby(['Soft_drink','ReAdmis']).size().reset_index(),
+values=0,
+index='Soft_drink',
+columns=['ReAdmis'],
+aggfunc=np.sum)
+tbl.plot(kind='bar',stacked=True)
+tbl = pd.pivot_table(df.groupby(['Initial_admin','ReAdmis']).size().reset_index(),
+values=0,
+index='Initial_admin',
+columns=['ReAdmis'],
+aggfunc=np.sum)
+tbl.plot(kind='bar',stacked=True)
+tbl = pd.pivot_table(df.groupby(['HighBlood','ReAdmis']).size().reset_index(),
+values=0,
+index='HighBlood',
+columns=['ReAdmis'],
+aggfunc=np.sum)
+tbl.plot(kind='bar',stacked=True)
+tbl = pd.pivot_table(df.groupby(['Stroke','ReAdmis']).size().reset_index(),
+values=0,
+index='Stroke',
+columns=['ReAdmis'],
+aggfunc=np.sum)
+tbl.plot(kind='bar',stacked=True)
+tbl = pd.pivot_table(df.groupby(['Complication_risk','ReAdmis']).size().reset_index(),
+values=0,
+index='Complication_risk',
+columns=['ReAdmis'],
+aggfunc=np.sum)
+tbl.plot(kind='bar',stacked=True)
+tbl = pd.pivot_table(df.groupby(['Overweight','ReAdmis']).size().reset_index(),
+values=0,
+index='Overweight',
+columns=['ReAdmis'],
+aggfunc=np.sum)
+tbl.plot(kind='bar',stacked=True)
+tbl = pd.pivot_table(df.groupby(['Arthritis','ReAdmis']).size().reset_index(),
+values=0,
+index='Arthritis',
+columns=['ReAdmis'],
+aggfunc=np.sum)
+tbl.plot(kind='bar',stacked=True)
+tbl = pd.pivot_table(df.groupby(['Diabetes','ReAdmis']).size().reset_index(),
+values=0,
+index='Diabetes',
+columns=['ReAdmis'],
+aggfunc=np.sum)
+tbl.plot(kind='bar',stacked=True)
+tbl = pd.pivot_table(df.groupby(['Hyperlipidemia','ReAdmis']).size().reset_index(),
+values=0,
+index='Hyperlipidemia',
+columns=['ReAdmis'],
+aggfunc=np.sum)
+tbl.plot(kind='bar',stacked=True)
+tbl = pd.pivot_table(df.groupby(['BackPain','ReAdmis']).size().reset_index(),
+values=0,
+index='BackPain',
+columns=['ReAdmis'],
+aggfunc=np.sum)
+tbl.plot(kind='bar',stacked=True)
+tbl = pd.pivot_table(df.groupby(['Anxiety','ReAdmis']).size().reset_index(),
+values=0,
+index='Anxiety',
+columns=['ReAdmis'],
+aggfunc=np.sum)
+tbl.plot(kind='bar',stacked=True)
+tbl = pd.pivot_table(df.groupby(['Allergic_rhinitis','ReAdmis']).size().reset_index(),
+values=0,
+index='Allergic_rhinitis',
+columns=['ReAdmis'],
+aggfunc=np.sum)
+tbl.plot(kind='bar',stacked=True)
+tbl = pd.pivot_table(df.groupby(['Reflux_esophagitis','ReAdmis']).size().reset_index(),
+values=0,
+index='Reflux_esophagitis',
+columns=['ReAdmis'],
+aggfunc=np.sum)
+tbl.plot(kind='bar',stacked=True)
+tbl = pd.pivot_table(df.groupby(['Asthma','ReAdmis']).size().reset_index(),
+values=0,
+index='Asthma',
+columns=['ReAdmis'],
+aggfunc=np.sum)
+tbl.plot(kind='bar',stacked=True)
+
+

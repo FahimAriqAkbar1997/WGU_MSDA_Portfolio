@@ -1,0 +1,117 @@
+~~Full Code used for D208 Task 1 Submission~~
+
+~~DATA CLEANING AND PREPARATION CODE~~
+#import packages and clean data before running multiple regression analysis. Rename the survey item variables accordingly.
+import numpy as np
+import pandas as pd
+from sklearn import linear_model
+import matplotlib.pyplot as plt
+import seaborn as sns
+%matplotlib inline
+pd.set_option('display.max_columns', None)
+import pylab
+from pylab import rcParams
+import statsmodels.api as sm
+import statistics
+from scipy import stats
+import sklearn
+from sklearn import preprocessing
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import train_test_split
+from sklearn import metrics
+from sklearn.metrics import classification_report
+from scipy.stats import chisquare
+from scipy.stats import chi2_contingency
+df = pd.read_csv (r'C:\Users\fahim\Documents\0_WGUDocuments\d208\1medical_clean.csv')
+df.rename(columns={'Item1':'Timely_admis','Item2':'Timely_treat',
+ 'Item3':'Timely_visits','Item4':'Reliability',
+ 'Item5':'Options','Item6':'Hrs_treat',
+ 'Item7':'Courteous','Item8':'Active_listen'},inplace=True)
+df.head()
+df.info()
+
+#check if there are any missing data entries - if there are none then the output should be False
+df.isna().any()
+
+#check if there is any duplicate data entries present in columns
+df[df.duplicated()
+
+# check if there are any duplicated rows in the data set - if there are none then the output should be False
+df.duplicated().any()
+
+# remove demographic data from the data set since these entries won't be necessary for the multiple regression analysis
+df = df.drop(['CaseOrder','Customer_id','Interaction','UID','City','State','County','Zip','Lat','Lng','Population','Area','TimeZone','Job'], axis=1)
+
+# check to make sure that the columns for demographic data were dropped before proceeding
+df.head()
+
+# convert categorical yes/no values to numeric 1/0 values
+df = df.replace(to_replace = ['Yes','No'],value = [1,0])
+df
+
+# convert the categorical variable of genders to a numeric variable
+df['Gender'] = df['Gender'].replace(['Male','Female','Nonbinary'],[1,2,3])
+df
+
+# convert the non-married Marital status values to "Married/Not Married", then convert "Married/Not Married" to "1/0"
+#this will make the Marital variable easier to work with during regression analysis
+df['Marital'] = df['Marital'].replace(['Divorced','Widowed','Separated','Never Married'],'Not Married')
+df['Marital'] = df['Marital'].replace(['Married','Not Married'],[1,0])
+
+# convert the Initial_Admin, Complication_risk, and Services variables into integers before proceeding
+df['Initial_admin'] = df['Initial_admin'].replace(['Elective Admission','Observation Admission','Emergency Admission'],[1,2,3])
+df['Complication_risk'] = df['Complication_risk'].replace(['Low','Medium','High'],[1,2,3])
+df['Services'] = df['Services'].replace(['Blood Work','CT Scan','Intravenous','MRI'],[1,2,3,4])
+df.info()
+df.describe()
+my_list = df.columns.values.tolist()
+print(my_list)
+
+# move the chosen target variable "Initial_days" to beginning of the columns
+df=df[['Initial_days','Children', 'Age', 'Income', 'Marital', 'Gender', 'ReAdmis', 'VitD_levels', 'Doc_visits', 'Full_meals_eaten', 'vitD_supp', 'Soft_drink', 'Initial_admin', 'HighBlood', 'Stroke', 'Complication_risk', 'Overweight', 'Arthritis', 'Diabetes', 'Hyperlipidemia', 'BackPain', 'Anxiety', 'Allergic_rhinitis', 'Reflux_esophagitis', 'Asthma', 'Services', 'TotalCharge', 'Additional_charges', 'Timely_admis', 'Timely_treat', 'Timely_visits', 'Reliability', 'Options', 'Hrs_treat', 'Courteous', 'Active_listen']]
+# Confirm that the target variable was moved before exporting the prepared dataset
+my_list = df.columns.values.tolist()
+print(my_list)
+# describe the dataframe to identify distribution of variables
+df.describe()
+
+# now that all the modifications have been made, export the prepared dataset
+df.to_csv(r'C:\Users\fahim\Documents\0_WGUDocuments\d208\1medical_clean-PREPAREDTASK1.csv')
+
+~~CODE USED FOR CREATING HISTORGRAMS, BOXPLOTS, AND SCATTERPLOTS~~
+# identify the columns for numerical data
+NumericalData = df.select_dtypes(include = "number").columns
+print (NumericalData)
+
+~~CODE USED FOR RETRIEVING THE OLS REGRESSION RESULTS~~
+# retrieve the OLS Regression Results
+print(lm_initialdays.summary())
+
+~~CODE USED FOR CREATING HEATMAP AND CORRELATION MATRIX~~
+# to address the strong multicollinearity, create heatmap and correlation matrix
+medical_heatmap = df[['Initial_days','Age', 'ReAdmis', 'Doc_visits', 'Initial_admin', 'HighBlood', 'Stroke', 'Complication_risk', 'Diabetes','Anxiety', 'Allergic_rhinitis', 'Reflux_esophagitis', 'Asthma', 'Services', 'TotalCharge', 'Additional_charges', 'Timely_admis', 'Timely_treat', 'Hrs_treat','Active_listen']]
+#Initial model heatmap
+sns.heatmap(medical_heatmap.corr(), annot=False)
+plt.show
+medical_heatmap.corr()
+
+# to narrow the results, remove the diagnosis and survey variables and create a reduced initial model heatmap
+medical_heatmap = df[['Initial_days','Age', 'ReAdmis', 'Initial_admin','Complication_risk', 'TotalCharge','Additional_charges']]
+sns.heatmap(medical_heatmap.corr(), annot=True)
+plt.show
+
+~~CODE USED FOR RETRIEVING THE OLS REGRESSION RESULTS FOR THE REDUCED MODEL~~
+# create the reduced multiple regression model
+df['intercept'] = 1
+lm_initialdays_reduced = sm.OLS(df['Initial_days'],df[['Age', 'ReAdmis','Initial_admin', 'Complication_risk','TotalCharge', 'Additional_charges','intercept']]).fit()
+print(lm_initialdays_reduced.summary())
+
+
+~~CODE USED FOR CREATING RESIDUAL PLOT~~
+# load cleaned data to use for the residual plot; we will name the dataframe "regression_df" to make it easier to keep track of
+regression_df = pd.read_csv(r'C:\Users\fahim\Documents\0_WGUDocuments\d208\1medical_clean-PREPAREDTASK1.csv')
+# create the residual plot
+regression_df['intercept'] = 1
+residuals = regression_df['Initial_days'] - lm_initialdays_reduced.predict(regression_df[['Age','ReAdmis','Initial_admin','Complication_risk', 'TotalCharge','Additional_charges','intercept']])
+sns.scatterplot(x=regression_df['TotalCharge'],y=residuals,color='green')
+plt.show();

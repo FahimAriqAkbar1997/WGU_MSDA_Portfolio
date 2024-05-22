@@ -1,0 +1,16 @@
+~~D211 Task 1 Code~~
+
+CREATE TABLE public."Medical_Stroke"
+(   
+	gender varchar(12) not null,
+    high_blood_pressure integer not null,
+    heart_disease integer not null,
+    ever_married varchar(12) not null,
+    residence_type varchar(12) not null,
+    bmi decimal not null,
+    smoking_status varchar(24) not null,
+    stroke integer not null,
+);
+
+ALTER TABLE public."Medical_Stroke"
+    OWNER to postgres;

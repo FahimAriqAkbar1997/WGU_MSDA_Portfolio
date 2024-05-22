@@ -1,0 +1,137 @@
+~~Full Code used for D209 Task 2 Submission~~
+
+~~CODE USED FOR IMPORTING PACKAGES AND DATA CLEANING CODE~~
+
+
+~~PREDICTIVE ANALYSIS CODE~~
+#import packages and clean data before running predictive analysis
+import numpy as np
+import pandas as pd
+from sklearn import linear_model
+import matplotlib.pyplot as plt
+import seaborn as sns
+%matplotlib inline
+import sklearn
+from sklearn import datasets
+from sklearn.preprocessing import StandardScaler
+from sklearn import preprocessing
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import cross_val_score, train_test_split
+from sklearn import metrics
+from sklearn.metrics import classification_report
+pd.set_option('display.max_columns', None)
+df = pd.read_csv (r'C:\Users\fahim\Documents\0_WGUDocuments\d209\medical_clean.csv')
+df.head()
+df.info()
+
+#check if there are any missing data entries
+df.isna().any()
+
+#check if there are any duplicate data entries in columns
+df[df.duplicated()]
+
+#check if there are any duplicated columns - if there are none than the output should say False
+df.columns.duplicated().any()
+
+#check if there are any duplicated rows - if there are none than the output should say False
+df.duplicated().any()
+
+#remove the demographic data categories deemed unecessary during our data preparation plan
+df = df.drop(['CaseOrder','Customer_id','Interaction','UID','City','State','County','Zip','Lat','Lng','Population','Area','TimeZone','Job'], axis=1)
+
+#rename the survey columns to their respective titles so that they can be more easily identified
+df.rename(columns={'Item1':'Timely_admis','Item2':'Timely_treat','Item3':'Timely_visits','Item4':'Reliability','Item5':'Options','Item6':'Hrs_treat','Item7':'Courteous','Item8':'Active_listen'},inplace=True)
+
+#check to see that the survey columns were renamed correctly and that the demographic categories were removed
+df.head()
+
+#create a new dataframe for the predictive analysis containing the target variable and chosen predictor variables
+medpredict_df_new=df[['Age','Doc_visits','Initial_days','TotalCharge','Additional_charges', 'Initial_admin','Stroke','Complication_risk','ReAdmis']].copy()
+
+#change the responses for Initial_admin, Stroke, and Complication_risk to numeric values and export
+medpredict_df_new['Initial_admin'].replace(('Elective Admission','Observation Admission','Emergency Admission'), (0,1,2), inplace=True)
+medpredict_df_new['Complication_risk'].replace(('Low','Medium','High'), (0,1,2), inplace=True)
+medpredict_df_new['Stroke'].replace(('Yes','No'),(1,0),inplace=True)
+medpredict_df_new.head()
+medpredict_df_new.to_csv(r'C:\Users\fahim\Documents\0_WGUDocuments\d209\medical_D209TASK2PREPAREDFINAL.csv', index=False)
+
+#scale the dataset to prepare for the application of Random Forest
+predictors = medpredict_df_new.columns[medpredict_df_new.dtypes.apply(lambda c: np.issubdtype(c, np.number))]
+scaler=StandardScaler()
+medpredict_df_new[predictors] = scaler.fit_transform(medpredict_df_new[predictors])
+
+#convert the values of the target variable into numeric variables
+medpredict_df_new['ReAdmis']=df.ReAdmis.map(dict(Yes=1, No=0))
+
+#show scaled data to make sure that everything was done correctly
+medpredict_df_new.head()
+
+#to begin predictive analysis, seperate data into testing and training datasets
+train , test = train_test_split(medpredict_df_new,test_size=0.20, random_state=42)
+x_train=train.drop('ReAdmis',axis=1)
+y_train=train['ReAdmis']
+x_test=test.drop('ReAdmis',axis=1)
+y_test=test['ReAdmis']
+
+#export the testing and training files
+x_train.to_csv(r'C:\Users\fahim\Documents\0_WGUDocuments\d209\medical_xtrain2final.csv', index = False)
+x_test.to_csv(r'C:\Users\fahim\Documents\0_WGUDocuments\d209\medical_xtest2final.csv', index = False)
+y_train.to_csv(r'C:\Users\fahim\Documents\0_WGUDocuments\d209\medical_ytrain2final.csv', index = False)
+y_test.to_csv(r'C:\Users\fahim\Documents\0_WGUDocuments\d209\medical_ytest2final.csv', index = False)
+
+#Import RandomForestClassifier and create the model to run this analysis
+from sklearn.ensemble import RandomForestClassifier
+clf = RandomForestClassifier(bootstrap = True, class_weight = None, criterion = 'gini', max_depth = None, max_features = 'auto', max_leaf_nodes = None, min_impurity_decrease = 0.0, min_samples_leaf = 1, min_samples_split = 2, min_weight_fraction_leaf = 0.0, n_estimators = 100, n_jobs = 1, oob_score = False, random_state = None, verbose = 0, warm_start = False)
+clf.fit(x_train,y_train)
+
+#Save the created predictions of the model
+y_pred=clf.predict(x_test)
+
+#Now show the predictions vs actual values
+pd.DataFrame(data={'Predicted': y_pred, 'Actual': y_test}).head(15)
+
+#Print out the Classification report for this analysis
+from sklearn.metrics import classification_report
+print(classification_report(y_test, y_pred))
+
+#Print the accuracy score; the desired score should be 95% or above
+from sklearn.metrics import accuracy_score
+accuracy = accuracy_score(y_test, y_pred)
+print(accuracy)
+
+#Print the recall score
+from sklearn.metrics import recall_score
+recall_score(y_test, y_pred, average='weighted')
+
+#Print precision Score
+from sklearn.metrics import precision_score
+precision_score(y_test, y_pred, average='weighted')
+
+#Print F1 Score
+from sklearn.metrics import f1_score
+f1_score(y_test, y_pred, average='weighted')
+
+#Create a plot showing the ROC curves
+import scikitplot as skplt
+y_probas=clf.predict_proba(x_test)
+skplt.metrics.plot_roc(y_test, y_probas, figsize=(10, 8))
+plt.show()
+
+#Determine the AUC
+from sklearn import preprocessing
+from sklearn.metrics import roc_auc_score
+def aucScore(y_test, y_pred, average="weighted"): 
+    lb = preprocessing.LabelBinarizer()
+    lb.fit(y_test)
+    y_test = lb.transform(y_test)
+    y_pred = lb.transform(y_pred)
+    return roc_auc_score(y_test, y_pred, average=average)
+
+#Print the Area Under Curve value
+aucScore(y_test, y_pred)
+
+#Calculate and Print the Mean Squared Error value
+from sklearn.metrics import mean_squared_error
+mean_squared_error(y_test,y_pred)

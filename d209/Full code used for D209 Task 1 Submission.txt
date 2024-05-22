@@ -1,0 +1,168 @@
+~~Full Code used for D209 Task 1 Submission~~
+
+~~DATA CLEANING CODE~~
+#clean data
+import numpy as np
+import pandas as pd
+from sklearn import linear_model
+import matplotlib.pyplot as plt
+import seaborn as sns
+%matplotlib inline
+import sklearn
+from sklearn import datasets
+from sklearn import preprocessing
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import cross_val_score, train_test_split
+from sklearn import metrics
+from sklearn.metrics import classification_report
+pd.set_option('display.max_columns', None)
+df = pd.read_csv (r'C:\Users\fahim\Documents\0_WGUDocuments\d209\medical_clean.csv')
+df.head()
+df.info()
+
+#check for missing data entries
+df.isna().any()
+
+#check for any duplicate data entries in columns
+df[df.duplicated()]
+
+#check if any columns are duplicated - looking for False
+df.columns.duplicated().any()
+
+#check if any rows are duplicated - looking for False
+df.duplicated().any()
+
+# drop demographic data
+df = df.drop(['CaseOrder','Customer_id','Interaction','UID','City','State','County','Zip','Lat','Lng','Population','Area','TimeZone','Job'], axis=1)
+
+#rename survey columns for easier identification
+df.rename(columns={'Item1':'Timely_admis','Item2':'Timely_treat','Item3':'Timely_visits','Item4':'Reliability','Item5':'Options','Item6':'Hrs_treat','Item7':'Courteous','Item8':'Active_listen'},inplace=True)
+
+#verify that the survey columns were renamed correctly
+df.head()
+
+#change yes/no to 1/0
+df = df.replace(to_replace = ['Yes','No'],value = [1,0])
+
+#verify that the values were changed
+df.head()
+
+# drop non-numeric variables that are less relevant
+df = df.drop(['Marital', 'Gender','Initial_admin','Complication_risk','Services'], axis=1)
+
+#verify that the non-numeric variables were dropped
+df.head()
+
+df.to_csv(r'C:\Users\fahim\Documents\0_WGUDocuments\d209\medical_D209TASK1PREPARED.csv', index=False)
+
+~~CLASSIFICATION ANALYSIS CODE~~
+#set predictor variables and target variable
+x=df.drop('ReAdmis',axis=1).values
+y=df['ReAdmis'].values
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import cross_val_score, train_test_split
+
+#set seed in order to reproduce
+SEED=1
+
+#create training and test datasets
+X_train,X_test,Y_train,Y_test = train_test_split(x,y,test_size=0.20,random_state=SEED)
+
+#export test and training data
+X_train.tofile(r'C:\Users\fahim\Documents\0_WGUDocuments\d209\medical_Xtrain.csv',sep=',')
+X_test.tofile(r'C:\Users\fahim\Documents\0_WGUDocuments\d209\medical_Xtest.csv',sep=',')
+Y_train.tofile(r'C:\Users\fahim\Documents\0_WGUDocuments\d209\medical_Ytrain.csv',sep=',')
+Y_test.tofile(r'C:\Users\fahim\Documents\0_WGUDocuments\d209\medical_Ytest.csv',sep=',')
+
+#begin the KNN model
+knn=KNeighborsClassifier(n_neighbors=7)
+
+#fit data to KNN model
+knn.fit(X_train,Y_train)
+
+#predict outcomes from test data
+Y_pred=knn.predict(X_test)
+
+#show initial accuracy score of KNN model
+print('Initial accuracy score of KNN model: ',accuracy_score(Y_test,Y_pred))
+
+#compute classification metrics
+print(classification_report(Y_test,Y_pred))
+
+#scale data
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
+from sklearn.metrics import accuracy_score
+steps=[('scaler',StandardScaler()),('KNN',KNeighborsClassifier())]
+pipeline=Pipeline(steps)
+
+#split data
+X_train_scaled,X_test_scaled,Y_train_scaled,Y_test_scaled=train_test_split(x,y,test_size=0.20,random_state=SEED)
+
+#scale data with pipeline
+KNN_scaled=pipeline.fit(X_train_scaled,Y_train_scaled)
+
+#predict from scaled data
+Y_pred_scaled=pipeline.predict(X_test_scaled)
+
+#show new accuracy score of scaled KNN model
+print('New accuracy score of scaled KNN model:{:0.3f}'.format(accuracy_score(Y_test_scaled,Y_pred_scaled)))
+
+#compute new classification metrics after scaling
+print(classification_report(Y_test_scaled,Y_pred_scaled))
+
+#import confustin matrix from sklearn
+from sklearn.metrics import confusion_matrix
+cf_matrix=confusion_matrix(Y_test,Y_pred)
+print(cf_matrix)
+
+#visualize confustion matrix
+group_names=['True Neg','False Pos','False Neg','True Pos']
+group_counts=["{0:0.0f}".format(value) for value in cf_matrix.flatten()]
+group_percentages=["{0:.2%}".format(value) for value in cf_matrix.flatten()/np.sum(cf_matrix)]
+labels=[f"{v1}\n{v2}\n{v3}" for v1,v2,v3 in
+zip(group_names,group_counts,group_percentages)]
+labels=np.asarray(labels).reshape(2,2)
+sns.heatmap(cf_matrix,annot=labels,fmt='',cmap='Greens')
+
+#import GridSearch for cross validation
+from sklearn.model_selection import GridSearchCV
+
+#set parameters
+param_grid={'n_neighbors':np.arange(1,50)}
+
+#recall KNN for cross validation
+KNN=KNeighborsClassifier()
+
+#begin GridSearch cross validation
+knn_cv=GridSearchCV(KNN,param_grid,cv=5)
+
+#fit model
+knn_cv.fit(X_train,Y_train)
+
+#show best parameters
+print('Best parameters for the KNN model: {}'.format(knn_cv.best_params_))
+
+#show model best score
+print('Best score for the KNN model: {:.3f}'.format(knn_cv.best_score_))
+
+~~AREA UNDER THE CURVE CODE~~
+#import ROC AUC to explain area under curve
+from sklearn.metrics import roc_auc_score
+
+#fit to data
+knn_cv.fit(x,y)
+
+#determine predicted probabilities
+Y_pred_prob=knn_cv.predict_proba(X_test)[:,1]
+
+#determine and show AUC score
+print("The Area Under Curve (AUC) on validation data is:{:.4f}".format(roc_auc_score(Y_test,Y_pred_prob)))
+
+#determine cross-validated AUC scores
+cv_auc=cross_val_score(knn_cv,x,y,cv=5,scoring='roc_auc')
+
+#show AUC scores
+print("AUC scores computed using 5-fold cross validation: {}".format(cv_auc))

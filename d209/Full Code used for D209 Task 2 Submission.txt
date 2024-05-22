@@ -1,0 +1,130 @@
+~~Full Code used for D209 Task 2 Submission~~
+
+~~DATA CLEANING CODE~~
+#clean data
+import numpy as np
+import pandas as pd
+from sklearn import linear_model
+import matplotlib.pyplot as plt
+import seaborn as sns
+%matplotlib inline
+import sklearn
+from sklearn import datasets
+from sklearn import preprocessing
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import cross_val_score, train_test_split
+from sklearn import metrics
+from sklearn.metrics import classification_report
+pd.set_option('display.max_columns', None)
+df = pd.read_csv (r'C:\Users\fahim\Documents\0_WGUDocuments\d209\medical_clean.csv')
+df.head()
+df.info()
+
+#check for missing data entries
+df.isna().any()
+
+#check for any duplicate data entries in columns
+df[df.duplicated()]
+
+#check if any columns are duplicated - looking for False
+df.columns.duplicated().any()
+
+#check if any rows are duplicated - looking for False
+df.duplicated().any()
+
+# drop demographic data
+df = df.drop(['CaseOrder','Customer_id','Interaction','UID','City','State','County','Zip','Lat','Lng','Population','Area','TimeZone','Job'], axis=1)
+
+#rename survey columns for easier identification
+df.rename(columns={'Item1':'Timely_admis','Item2':'Timely_treat','Item3':'Timely_visits','Item4':'Reliability','Item5':'Options','Item6':'Hrs_treat','Item7':'Courteous','Item8':'Active_listen'},inplace=True)
+
+#verify that the survey columns were renamed correctly
+df.head()
+
+newdf=df[['Age','Doc_visits','Initial_days','TotalCharge','Additional_charges', 'Initial_admin','Stroke','Complication_risk','ReAdmis']].copy()
+
+#change Initial_admin, Stroke, and Complication_risk responses to numeric
+newdf['Initial_admin'].replace(('Elective Admission','Observation Admission','Emergency Admission'), (0,1,2), inplace=True)
+newdf['Complication_risk'].replace(('Low','Medium','High'), (0,1,2), inplace=True)
+newdf['Stroke'].replace(('Yes','No'),(1,0),inplace=True)
+newdf.head()
+newdf.to_csv(r'C:\Users\fahim\Documents\0_WGUDocuments\d209\medical_D209TASK2PREPARED.csv', index=False)
+
+#scale data
+predictors = newdf.columns[newdf.dtypes.apply(lambda c: np.issubdtype(c, np.number))]
+scaler=StandardScaler()
+newdf[predictors] = scaler.fit_transform(newdf[predictors])
+
+#convert target variable to numeric
+newdf['ReAdmis']=df.ReAdmis.map(dict(Yes=1, No=0))
+
+#show scaled data
+newdf.head()
+
+~~PREDICTIVE ANALYSIS CODE~~
+#split data into test and train datasets
+train , test = train_test_split(newdf,test_size=0.20, random_state=42)
+x_train=train.drop('ReAdmis',axis=1)
+y_train=train['ReAdmis']
+x_test=test.drop('ReAdmis',axis=1)
+y_test=test['ReAdmis']
+
+#export test and train files
+x_train.to_csv(r'C:\Users\fahim\Documents\0_WGUDocuments\d209\medical_xtrain2.csv', index = False)
+x_test.to_csv(r'C:\Users\fahim\Documents\0_WGUDocuments\d209\medical_xtest2.csv', index = False)
+y_train.to_csv(r'C:\Users\fahim\Documents\0_WGUDocuments\d209\medical_ytrain2.csv', index = False)
+y_test.to_csv(r'C:\Users\fahim\Documents\0_WGUDocuments\d209\medical_ytest2.csv', index = False)
+
+from sklearn.ensemble import RandomForestClassifier
+clf = RandomForestClassifier(bootstrap = True, class_weight = None, criterion = 'gini', max_depth = None, max_features = 'auto', max_leaf_nodes = None, min_impurity_decrease = 0.0, min_samples_leaf = 1, min_samples_split = 2, min_weight_fraction_leaf = 0.0, n_estimators = 100, n_jobs = 1, oob_score = False, random_state = None, verbose = 0, warm_start = False)
+clf.fit(x_train,y_train)
+
+#Saving predictions
+y_pred=clf.predict(x_test)
+
+#Showing predictions vs actual
+pd.DataFrame(data={'Predicted': y_pred, 'Actual': y_test}).head(15)
+
+#Classification report
+from sklearn.metrics import classification_report
+print(classification_report(y_test, y_pred))
+
+#Show accuracy score
+from sklearn.metrics import accuracy_score
+accuracy = accuracy_score(y_test, y_pred)
+print(accuracy)
+
+#Show recall Score
+from sklearn.metrics import recall_score
+recall_score(y_test, y_pred, average='weighted')
+
+#Show precision Score
+from sklearn.metrics import precision_score
+precision_score(y_test, y_pred, average='weighted')
+
+#Show F1 Score
+from sklearn.metrics import f1_score
+f1_score(y_test, y_pred, average='weighted')
+import scikitplot as skplt
+y_probas=clf.predict_proba(x_test)
+skplt.metrics.plot_roc(y_test, y_probas, figsize=(10, 8))
+plt.show()
+
+#Determine AUC
+from sklearn import preprocessing
+from sklearn.metrics import roc_auc_score
+def aucScore(y_test, y_pred, average="weighted"): 
+    lb = preprocessing.LabelBinarizer()
+    lb.fit(y_test)
+    y_test = lb.transform(y_test)
+    y_pred = lb.transform(y_pred)
+    return roc_auc_score(y_test, y_pred, average=average)
+
+#Area Under Curve
+aucScore(y_test, y_pred)
+
+#Mean Squared Error
+from sklearn.metrics import mean_squared_error
+mean_squared_error(y_test,y_pred)

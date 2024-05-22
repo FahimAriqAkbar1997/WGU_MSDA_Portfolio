@@ -1,0 +1,39 @@
+SELECT CAST("patient"."gender" AS TEXT) AS "gender (patient)",
+  CAST("patient"."stroke" AS TEXT) AS "stroke (patient)"
+FROM "public"."patient" "patient"
+GROUP BY 1,
+  2
+
+SELECT CAST(""patient"".""gender"" AS TEXT) AS ""gender (patient)"",
+  CAST(""patient"".""stroke"" AS TEXT) AS ""stroke (patient)""
+FROM ""public"".""patient"" ""patient""
+WHERE ((CAST(""patient"".""gender"" AS TEXT) >= 'Female') AND (CAST(""patient"".""gender"" AS TEXT) <= 'Prefer not to answer'))
+GROUP BY 1,
+  2
+
+SQL behind innerjoin of 'gender' between each data set:
+SELECT "healthcare-dataset-stroke-data.csv"."gender" AS "gender",
+  "healthcare-dataset-stroke-data.csv"."stroke" AS "stroke"
+FROM "db2002"."TableauTemp"."healthcare-dataset-stroke-data#csv" "healthcare-dataset-stroke-data.csv"
+  INNER JOIN "public"."Tableau_14_73AE7894-9F48-4570-BC1E-8CC9B5E2615F_4_FQ_Temp_1" "FQ_Temp_1" ON ("healthcare-dataset-stroke-data.csv"."gender" = "FQ_Temp_1"."gender")
+WHERE ("healthcare-dataset-stroke-data.csv"."gender" = 'Male') AND ("healthcare-dataset-stroke-data.csv"."gender" = 'Female') <= 'unknown'))
+GROUP BY 1,
+  2
+
+SQL behind visualizations for the Patient Table:
+
+SELECT CAST("patient"."gender" AS TEXT) AS "gender (patient)",
+  CAST("patient"."stroke" AS TEXT) AS "stroke (patient)"
+FROM "public"."patient" "patient"
+GROUP BY 1,
+  2
+
+SELECT CAST(""patient"".""highblood"" AS TEXT) AS ""highblood"",
+  CAST(""patient"".""stroke"" AS TEXT) AS ""stroke (patient)""
+FROM ""public"".""patient"" ""patient""
+GROUP BY 1,
+  2
+
+
+
+
