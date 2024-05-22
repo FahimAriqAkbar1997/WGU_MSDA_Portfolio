@@ -1,0 +1,94 @@
+~~Full Code used for D212 Task 3 Submission~~
+
+~~DATA CLEANING AND PREPARATION CODE~~
+#import packages and clean data before running the market basket analysis
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from mlxtend.frequent_patterns import association_rules, apriori
+from mlxtend.preprocessing import TransactionEncoder
+
+#import the csv file that will be used for this market basket analysis
+df = pd.read_csv('./medical_market_basket.csv')
+#give an example of a transaction from the dataset
+df.iloc[3]
+
+df = pd.read_csv (r'C:\Users\fahim\Documents\0_WGUDocuments\d208\1medical_clean.csv')
+df.head()
+df.info()
+
+#inspect the dataframe to make sure there aren't any issues that could affect our analysis
+pd.set_option("display.max_columns", None)
+df.head()
+
+#the provided dataset has every row of data separated by a blank row. we will get rid of these rows before proceeding
+df = df[df['Presc01'].notna()]
+#reset and check the index to make sure we aren't missing any rows
+df.reset_index(drop=True, inplace=True)
+df.info()
+
+#check to make sure all the empty rows are removed
+df.head()
+
+~~CODE USED FOR CREATING THE LIST OF LISTS~~
+#store the data in a big list of lists
+temp_big_list = []
+#iterate through each and within each row, iterate through each column
+for row_number in range(len(df)):
+    # Generate a temporary small list for each row
+    temp_small_list = []
+    for cell in range(len(df.columns)):
+        # check to make sure there are no null values in the cells
+        if not pd.isnull(df.iloc[row_number, cell]):
+            #if cell contents are not null, add a string version of that cell's contents to the temporary small list
+            temp_small_list.append(str(df.values[row_number, cell]))
+    #for the list of lists, add the small list to the ongoing big lists
+    temp_big_list.append(temp_small_list)
+#print the temp_big_list to make sure it looks the way we want it to
+print(f"list of lists... \nindex 0: {temp_big_list[0]}\nindex 1: {temp_big_list[1]}\n...\nindex7500: {temp_big_list[7500]}")
+
+~~CODE USED FOR CREATING A TRANSACTION ENCODER~~
+#create a transaction encoder
+encoder = TransactionEncoder()
+#add the transaction encoder to the list of lists, and then change and store the data in a temporary array
+temp_array = encoder.fit(temp_big_list).transform(temp_big_list)
+#generate a new dataframe from this temporary array
+new_df = pd.DataFrame(temp_array, columns=encoder.columns_)
+#check the new dataframe to make sure that it looks the way we want it to
+new_df
+
+~~CODE USED FOR CHECKING AND EXPORTING THE NEW DATAFRAME~~
+#print information about this new dataframe
+new_df.info()
+#now that the new dataframe has been created, export it as a csv file
+new_df.to_csv(r'C:\Users\fahim\Documents\0_WGUDocuments\d212\task3_marketbasket_clean.csv', index=False)
+
+~~CODE USED FOR GENERATING FREQUENT ITEMSETS~~
+#using the Apriori algorithm, generate frequent itemsets
+frequent_itemsets = apriori(new_df, min_support = 0.02, use_colnames = True)
+frequent_itemsets
+
+~~CODE USED FOR ASSOCIATION RULES~~
+# we will now use use association_rules with a lift of greater than 1
+rules = association_rules(frequent_itemsets, metric = 'lift', min_threshold = 1.0)
+rules
+#provide the association rules table, and showcase the scores for support, confidence, and lift.
+rules
+#showcase the top 3 rules of the associated rules table, having a lift of over 1.9 and confidence of 0.3
+top_3_rules = rules[(rules['lift'] > 1.9) & (rules['confidence'] > 0.3)].sort_values(by=['lift'], ascending= False)
+top_3_rules
+
+~~CODE USED FOR CHECKING ANTECDENT AND CONSEQUENT VALUES~~
+#check the value counts for antecedents values
+rules.antecedents.value_counts()
+
+#check the value counts for consequent values
+rules.consequents.value_counts()
+
+~~CODE USED TO PRINT THE ANTECEDENT AND CONSEQUENT VALUES FOR THE TARGET DRUG~~
+#now that all the rules for the dataframe have been set, print out the antecedent and consequent rules for our target drug cialis
+ant_df = rules[rules['antecedents'] == {'cialis'}]
+con_df = rules[rules['consequents'] == {'cialis'}]
+cialis_df = pd.concat([ant_df, con_df])
+cialis_df

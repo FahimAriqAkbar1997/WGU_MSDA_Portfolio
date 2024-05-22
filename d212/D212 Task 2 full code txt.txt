@@ -1,0 +1,201 @@
+~~Full Code used for D212 Task 2 Submission~~
+
+~~DATA CLEANING AND PREPARATION CODE~~
+#import packages and clean data before running the principal component analysis
+import numpy as np
+import pandas as pd
+from sklearn import linear_model
+from sklearn.preprocessing import StandardScaler
+import matplotlib.pyplot as plt
+import seaborn as sns
+%matplotlib inline
+pd.set_option('display.max_columns', None)
+import pylab
+from pylab import rcParams
+import statsmodels.api as sm
+import statistics
+from scipy import stats
+import sklearn
+from sklearn import preprocessing
+from sklearn.model_selection import train_test_split
+from sklearn import metrics
+from sklearn.metrics import classification_report
+from scipy.stats import chisquare
+from scipy.stats import chi2_contingency
+from sklearn.decomposition import PCA
+from sklearn.model_selection import train_test_split
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import confusion_matrix
+from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_curve
+from sklearn.metrics import accuracy_score
+
+df = pd.read_csv (r'C:\Users\fahim\Documents\0_WGUDocuments\d208\1medical_clean.csv')
+df.head()
+df.info()
+
+#check if there are any missing data entries - if there are none then the output should be False
+df.isna().any()
+
+#identify the continuous variables
+df.dtypes
+
+#identify the continuous variables
+cont = df.select_dtypes("number")
+cont.head()
+
+~~CODE USED FOR CREATING THE FIRST DATAFRAME~~
+#create a X dataframe with all of the chosen continuous variables for PCA
+X = df[["Age", "Income", "VitD_levels", "Initial_days", "TotalCharge","Additional_charges"]].copy()
+#create the list of column headers
+X_cols = list(X.columns)
+#set y to ReAdmis as that is our target variable we want to predict
+y = df["ReAdmis"]
+
+~~CODE USED FOR STANDARDIZATION OF THE VARIABLES FROM OUR FIRST DATAFRAME~~
+#perform the standardize of all of the continuous variables selected for our PCA
+X_std = StandardScaler().fit_transform(df[["Age", "Income", "VitD_levels", "Initial_days", "TotalCharge","Additional_charges"]].copy())
+#verify that everything has been standardized to mean of 0, and a standard deviation of 1
+print(f"Verifying means and standard deviation of each feature...")
+#place the standardized values into a temporary dataframe for verifications
+X_std_df = pd.DataFrame(X_std, columns=X_cols)
+#print out the mean and the standard deviation for each of the 6 columns that we've standardized
+for column in X_cols:
+    col_mean = round(X_std_df.loc[:,column].mean(), 4)
+    col_std = round(X_std_df.loc[:,column].std(), 4)
+    print(f"For column '{column}', the mean is {col_mean} and the standard deviation is {col_std}.")
+
+~~CODE USED FOR CREATING THE COVARIANCE MATRIX~~
+#generate a covariance matrix to check if any of our variables are perfectly correlated
+#define the colors red and yellow for the conditional formatting of the covariance matrix visualization
+def highlight_cells (val):
+    if val > 0.9:
+        color = 'red'
+    elif val > 0.6:
+        color = 'yellow'
+    else:
+        color = ''
+    return f"background: {color}"
+
+#now that the colors have been defined, proceed to generate the covariance matrix
+covariance_matrix = pd.DataFrame.cov(X_std_df)
+#apply the styling defined above. very closely correllated features will be displayed in red
+covariance_matrix.style.applymap(highlight_cells)
+
+#the covariance matrix indicates that Intial_days and TotalCharge are nearly perfectly correlated
+print(f"The correlation between Initial_days and TotalCharge is {X_std_df.Initial_days.corr(X_std_df.TotalCharge)}.")
+# Due to this redundancy, we will be dropping TotalCharge.
+
+~~CODE USED FOR CREATING THE NEW DATAFRAME~~
+#we will now create a new dataframe that does not include TotalCharge before proceeding.
+#create X dataframe with all of the continuous variables for PCA, excluding TotalCharge
+X = df[["Age", "Income", "VitD_levels", "Initial_days","Additional_charges"]].copy()
+#create the list of column headers
+X_cols = list(X.columns)
+#set y to ReAdmis as that is our target variable we want to predict
+y = df["ReAdmis"]
+
+~~CODE USED FOR STANDARDIZATION OF THE VARIABLES FOR OUR NEW DATAFRAME~~
+#perform the standardize of all of the continuous variables selected for our PCA
+X_std = StandardScaler().fit_transform(df[["Age", "Income", "VitD_levels", "Initial_days","Additional_charges"]].copy())
+#verify that everything has been standardized to mean of 0, and a standard deviation of 1
+print(f"Verifying means and standard deviation of each feature...")
+#place the standardized values into a temporary dataframe for verifications
+X_std_df = pd.DataFrame(X_std, columns=X_cols)
+#print out the mean and the standard deviation for each of the 5 columns that we've standardized
+for column in X_cols:
+    col_mean = round(X_std_df.loc[:,column].mean(), 4)
+    col_std = round(X_std_df.loc[:,column].std(), 4)
+    print(f"For column '{column}', the mean is {col_mean} and the standard deviation is {col_std}.")
+
+#now that we have our final dataframe, save and export this dataframe as a CSV file
+X_std_df.to_csv(r'C:\Users\fahim\Documents\0_WGUDocuments\d212\1medical_clean-PREPAREDTASK2.csv', index=False)
+
+~~CODE USED TO PERFORM PCA~~
+# X_std is the arrays created by the StandardScaler for us to perform PCA with
+#create the PCA object
+pca = PCA(n_components = 5, random_state = 369)
+#fit the PCA to the standardized X data, then transform
+X_pca = pca.fit_transform(X_std)
+#generate the matrix of PCA loadings, demonstrating the weight that a given feature contributes to that Principal Component 
+X_pca_loadings = pd.DataFrame(pca.components_.T, 
+                              columns = ["PC1", "PC2", "PC3", "PC4", "PC5"], 
+                              index = X_cols)
+X_pca_loadings
+
+#the 5 PC's generate the entire variance for this model
+print(f"These 5 principal components account for {round(sum(pca.explained_variance_ratio_ * 100), 3)}% of variance.")
+#show the individual contribution of each PC to the whole
+print(f"The contribution of each principal component to the total is shown here:")
+pc_contributions = list(pca.explained_variance_ratio_)
+pc_names = list(X_pca_loadings.columns)
+for i in range(len(pc_names)):
+    print(f"For {pc_names[i]}, the contribution is {round(pc_contributions[i] * 100, 3)}%")
+
+~~CODE USED TO CREATE SCREE PLOT~~
+#create a scree plot to help visualize the contribution of each PC to the whole of variance
+plt.plot(np.cumsum(pca.explained_variance_ratio_))
+plt.xlabel("Number of Principal Components")
+plt.ylabel("Percentage of Explained Variance")
+plt.show();
+
+~~CODE USED FOR FINAL PCA~~
+#since we want 4 components in our PCA from the prior step, we repeat the PCA process to generate a 'final_pca'
+final_pca = PCA(n_components = 4, random_state = 369)
+#fit the PCA to the standardized X data, then transform
+final_pca.fit(X_std)
+final_X_pca = final_pca.transform(X_std)
+#generate PCA loadings for the final_pca
+final_X_pca_loadings = pd.DataFrame(final_pca.components_.T, 
+                              columns = ["PC1", "PC2", "PC3", "PC4"], 
+                              index = X_cols)
+final_X_pca_loadings
+
+#before proceeding, show the individual contribution of each PC to the whole
+print(f"The amount of variance accounted for by each principal component can be seen here:")
+pc_contributions = list(final_pca.explained_variance_ratio_)
+pc_names = list(final_X_pca_loadings.columns)
+for i in range(len(pc_names)):
+    print(f"For {pc_names[i]}, the contribution is {round(pc_contributions[i] * 100, 3)}%")
+
+print(f"These final 4 principal components account for {round(sum(final_pca.explained_variance_ratio_ * 100), 3)}% of variance in the data.")
+
+~~CODE USED FOR SPLITTING THE final_X_pca TO TRAINING AND TESTING SETS~~
+#now that PCA finished, we can split the final_X_pca to train and test sets for classification
+#split the data into train and test sets, 80% train, 20% test, use stratify to maintain proportions across split
+X_train, X_test, y_train, y_test = train_test_split(final_X_pca, y, train_size = 0.8, test_size=0.2, random_state = 369, stratify = y)
+#verify that each of the X sets are correctly shaped and to reflect the 4 PC's
+print(f"The shape of the X_train set is: {X_train.shape}")
+print(f"The shape of the X_test set is: {X_test.shape}")
+
+~~CODE USED FOR CREATING OUR CLASSIFICATION MODEL~~
+#now that the data has been split accordingly, we can create our classification model
+classification_model = DecisionTreeClassifier(random_state=369).fit(X_train, y_train)
+y_predictions = classification_model.predict(X_test)
+#generate an accuracy report for our model
+test_accuracy = accuracy_score(y_test, y_predictions)
+print(f'Decision tree accuracy: {test_accuracy}') 
+# Predict the test set probabilities of the positive class
+y_pred_proba = classification_model.predict_proba(X_test)[:,1]
+#create the final confusion matrix
+final_matrix = confusion_matrix(y_test, y_predictions)
+print("\nThe confusion matrix for this Decision Tree model:")
+print("Predicted No Readmission  | Predicted Readmission")
+print(f"                    {final_matrix[0]} Actual No Readmission")
+print(f"                     {final_matrix[1]} Actual Readmission\n")
+
+~~CODE USED FOR ROC CURVE AND AUC SCORE~~
+#generate the ROC curve 
+y_true = y_test
+y_scores = y_pred_proba
+fpr, tpr, thresholds = roc_curve(y_true, y_scores, pos_label='Yes')
+plt.plot(fpr, tpr)
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('Receiver Operating Characteristic (ROC) Curve')
+plt.show()
+
+#compute the roc_auc score
+roc_auc = roc_auc_score(y_test, y_pred_proba)
+#print the roc auc score
+print(f'Area Under the Curve (AUC) score: {roc_auc}')

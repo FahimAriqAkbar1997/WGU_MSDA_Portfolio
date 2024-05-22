@@ -1,0 +1,221 @@
+~~Full Code used for D212 Task 1 Submission~~
+
+~~DATA CLEANING AND PREPARATION CODE~~
+#import packages and clean data before running the principal component analysis
+import numpy as np
+import pandas as pd
+from sklearn import linear_model
+from sklearn.preprocessing import StandardScaler
+import matplotlib.pyplot as plt
+import seaborn as sns
+%matplotlib inline
+pd.set_option('display.max_columns', None)
+import pylab
+from pylab import rcParams
+import statsmodels.api as sm
+import statistics
+from scipy import stats
+from scipy.cluster.hierarchy import linkage, fcluster
+from scipy.cluster.hierarchy import dendrogram
+from sklearn.metrics import silhouette_score
+import sklearn
+from sklearn import preprocessing
+from sklearn.model_selection import train_test_split
+from sklearn import metrics
+from sklearn.metrics import classification_report
+from scipy.stats import chisquare
+from scipy.stats import chi2_contingency
+from sklearn.decomposition import PCA
+from sklearn.model_selection import train_test_split
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import confusion_matrix
+from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_curve
+from sklearn.metrics import accuracy_score
+
+df = pd.read_csv (r'C:\Users\fahim\Documents\0_WGUDocuments\d208\1medical_clean.csv')
+df.head()
+df.info()
+
+#check if there are any missing data entries - if there are none then the output should be False
+df.isna().any()
+# check if there are any duplicated columns in the data set - if there are none then the output should be False
+df.columns.duplicated().any()
+# check if there are any duplicated rows in the data set - if there are none then the output should be False
+df.duplicated().any()
+
+# rename the item columns accordingly
+df.rename(columns={'Item1':'Timely_admis','Item2':'Timely_treat',
+ 'Item3':'Timely_visits','Item4':'Reliability',
+ 'Item5':'Options','Item6':'Hrs_treat',
+ 'Item7':'Courteous','Item8':'Active_listen'},inplace=True)
+df.head()
+df.info()
+
+~~CODE FOR SHOWCASING DATA HOMOGENEITY AND EXPORTING THE FINAL DATAFRAME~~
+#print the mean overall scores and and standard deviations of the target variables
+print(f"The mean overall score for Timely_admis is {round(df.Timely_admis.mean(), 3)}, with a standard deviation of {round(df.Timely_admis.std(), 3)}.")
+print(f"The mean overall score for Timely_treat is {round(df.Timely_treat.mean(), 3)}, with a standard deviation of {round(df.Timely_treat.std(), 3)}.")
+print(f"The mean overall score for Timely_visits is {round(df.Timely_visits.mean(), 3)}, with a standard deviation of {round(df.Timely_visits.std(), 3)}.")
+print(f"The mean overall score for Reliability is {round(df.Reliability.mean(), 3)}, with a standard deviation of {round(df.Reliability.std(), 3)}.")
+print(f"The mean overall score for Options is {round(df.Options.mean(), 3)}, with a standard deviation of {round(df.Options.std(), 3)}.")
+print(f"The mean overall score for Hrs_treat is {round(df.Hrs_treat.mean(), 3)}, with a standard deviation of {round(df.Hrs_treat.std(), 3)}.")
+print(f"The mean overall score for Courteous is  {round(df.Courteous.mean(), 3)}, with a standard deviation of {round(df.Courteous.std(), 3)}.")
+print(f"The mean overall score for Active_listen is  {round(df.Active_listen.mean(), 3)}, with a standard deviation o
+
+#now that we have our final dataframe, save and export this dataframe as a CSV file
+df.to_csv(r'C:\Users\fahim\Documents\0_WGUDocuments\d212\1medical_clean-PREPAREDTASK1d212.csv', index=False)
+
+~~CODE USED FOR THE WARD LINKAGE METHOD AND DENDROGRAM CREATION~~
+#use the ward method linkage() function to implement hierarchical clustering 
+distance_matrix_ward = linkage(df[["Timely_admis", "Timely_treat", "Timely_visits", 
+                                             "Reliability", "Options", "Hrs_treat", 
+                                             "Courteous", "Active_listen"]], method = 'ward', metric = 'euclidean')
+# now that our linkage has been established, generate a dendrogram
+plt.figure(figsize = [16,5])
+dendrogram_ward = dendrogram(distance_matrix_ward)
+plt.xlabel("Patient Responses to Survey")
+plt.ylabel("Distance Between Clusters");
+plt.show()
+#assign cluster labels to the dendrogram
+df['ward_cluster_labels'] = fcluster(distance_matrix_ward, 2, criterion='maxclust')
+print(df['ward_cluster_labels'].value_counts().sort_index())
+
+
+~~CODE USED FOR PLOTTING THE DISTRIBUTION SCORES OF EACH QUESTION BY CLUSTER~~
+#plot the distribution scores for survey questions 1 and 2
+plt.figure(figsize = [16,5])
+
+# LEFT plot: Distribution of scores for survey question 1, by cluster label
+plt.subplot(1, 2, 1)
+plt.title('Distribution of Q1 Survey Scores by Cluster Label')
+sns.countplot(data = df, x="Timely_admis", hue="ward_cluster_labels")
+plt.legend(["Cluster 1", "Cluster 2"])
+plt.xlabel("Importance of Timely Admission (1 = most important)")
+plt.ylabel("Number of Patients");
+
+# RIGHT plot: Distribution of scores for survey question 2, by cluster label
+plt.subplot(1, 2, 2)
+plt.title("Distribution of Q2 Survey Scores by Cluster Label")
+sns.countplot(data = df, x="Timely_treat", hue="ward_cluster_labels")
+plt.legend(["Cluster 1", "Cluster 2"])
+plt.xlabel("Importance of Timely Treatment (1 = most important)")
+plt.ylabel("Number of Patients");
+
+q1_c1_mean = df.loc[df['ward_cluster_labels'] == 1, 'Timely_admis'].mean()
+q1_c2_mean = df.loc[df['ward_cluster_labels'] == 2, 'Timely_admis'].mean()
+print(f"\nFor Importance of Timely Admission respondents from Cluster 1 scored this at {round(q1_c1_mean, 3)}, on average.")
+print(f"Respondents from Cluster 2 scored this at {round(q1_c2_mean, 3)}, on average.")
+q2_c1_mean = df.loc[df['ward_cluster_labels'] == 1, 'Timely_treat'].mean()
+q2_c2_mean = df.loc[df['ward_cluster_labels'] == 2, 'Timely_treat'].mean()
+print(f"\nFor Importance of Timely Treatment, respondents from Cluster 1 scored this at {round(q2_c1_mean, 3)}, on average.")
+print(f"Respondents from Cluster 2 scored this at {round(q2_c2_mean, 3)}, on average.")
+
+#plot the distribution scores for survey questions 3 and 4
+plt.figure(figsize = [16,5])
+
+# LEFT plot: Distribution of scores for survey question 3, by cluster label
+plt.subplot(1, 2, 1)
+plt.title('Distribution of Q3 Survey Scores by Cluster Label')
+sns.countplot(data = df, x="Timely_visits", hue="ward_cluster_labels")
+plt.legend(["Cluster 1", "Cluster 2"])
+plt.xlabel("Importance of Timely Visits (1 = most important)")
+plt.ylabel("Number of Patients");
+
+# RIGHT plot: Distribution of scores for survey question 4, by cluster label
+plt.subplot(1, 2, 2)
+plt.title("Distribution of Q4 Survey Scores by Cluster Label")
+sns.countplot(data = df, x="Reliability", hue="ward_cluster_labels")
+plt.legend(["Cluster 1", "Cluster 2"])
+plt.xlabel("Importance of Reliability (8 = most important)")
+plt.ylabel("Number of Patients");
+
+q3_c1_mean = df.loc[df['ward_cluster_labels'] == 1, 'Timely_visits'].mean()
+q3_c2_mean = df.loc[df['ward_cluster_labels'] == 2, 'Timely_visits'].mean()
+print(f"\nFor Importance of Timely Visits, respondents from Cluster 1 scored this at {round(q3_c1_mean, 3)}, on average.")
+print(f"Respondents from Cluster 2 scored this at {round(q3_c2_mean, 3)}, on average.")
+q4_c1_mean = df.loc[df['ward_cluster_labels'] == 1, 'Reliability'].mean()
+q4_c2_mean = df.loc[df['ward_cluster_labels'] == 2, 'Reliability'].mean()
+print(f"\nFor Importance of Reliability, respondents from Cluster 1 scored this at {round(q4_c1_mean, 3)}, on average.")
+print(f"Respondents from Cluster 2 scored this at {round(q4_c2_mean, 3)}, on average.")
+
+#plot the distribution scores for survey questions 5 and 6
+plt.figure(figsize = [16,5])
+
+# LEFT plot: Distribution of scores for survey question 5, by cluster label
+plt.subplot(1, 2, 1)
+plt.title('Distribution of Q5 Survey Scores by Cluster Label')
+sns.countplot(data = df, x="Options", hue="ward_cluster_labels")
+plt.legend(["Cluster 1", "Cluster 2"])
+plt.xlabel("Importance of Options (8 = most important)")
+plt.ylabel("Number of Patients");
+
+# RIGHT plot: Distribution of scores for survey question 6, by cluster label
+plt.subplot(1, 2, 2)
+plt.title("Distribution of Q6 Survey Scores by Cluster Label")
+sns.countplot(data = df, x="Hrs_treat", hue="ward_cluster_labels")
+plt.legend(["Cluster 1", "Cluster 2"])
+plt.xlabel("Importance of Hours of Treatment (8 = most important)")
+plt.ylabel("Number of Patients");
+
+q5_c1_mean = df.loc[df['ward_cluster_labels'] == 1, 'Options'].mean()
+q5_c2_mean = df.loc[df['ward_cluster_labels'] == 2, 'Options'].mean()
+print(f"\nFor Importance of Options, respondents from Cluster 1 scored this at {round(q5_c1_mean, 3)}, on average.")
+print(f"Respondents from Cluster 2 scored this at {round(q5_c2_mean, 3)}, on average.")
+q6_c1_mean = df.loc[df['ward_cluster_labels'] == 1, 'Hrs_treat'].mean()
+q6_c2_mean = df.loc[df['ward_cluster_labels'] == 2, 'Hrs_treat'].mean()
+print(f"\nFor Importance of Hours of Treatment, respondents from Cluster 1 scored this at {round(q6_c1_mean, 3)}, on average.")
+print(f"Respondents from Cluster 2 scored this at {round(q6_c2_mean, 3)}, on average.")
+
+#plot the distribution scores for survey questions 7 and 8
+plt.figure(figsize = [16,5])
+
+# LEFT plot: Distribution of scores for survey question 7, by cluster label
+plt.subplot(1, 2, 1)
+plt.title('Distribution of Q7 Survey Scores by Cluster Label')
+sns.countplot(data = df, x="Courteous", hue="ward_cluster_labels")
+plt.legend(["Cluster 1", "Cluster 2"])
+plt.xlabel("Importance of Courteous Staff (8 = most important)")
+plt.ylabel("Number of Patients");
+
+# RIGHT plot: Distribution of scores for survey question 8, by cluster label
+plt.subplot(1, 2, 2)
+plt.title("Distribution of Q8 Survey Scores by Cluster Label")
+sns.countplot(data = df, x="Active_listen", hue="ward_cluster_labels")
+plt.legend(["Cluster 1", "Cluster 2"])
+plt.xlabel("Importance of Dr Active Listening (8 = most important)")
+plt.ylabel("Number of Patients");
+
+q7_c1_mean = df.loc[df['ward_cluster_labels'] == 1, 'Courteous'].mean()
+q7_c2_mean = df.loc[df['ward_cluster_labels'] == 2, 'Courteous'].mean()
+print(f"\nFor Importance of Courteous Staff, respondents from Cluster 1 scored this at {round(q7_c1_mean, 3)}, on average.")
+print(f"Respondents from Cluster 2 scored this at {round(q7_c2_mean, 3)}, on average.")
+q8_c1_mean = df.loc[df['ward_cluster_labels'] == 1, 'Active_listen'].mean()
+q8_c2_mean = df.loc[df['ward_cluster_labels'] == 2, 'Active_listen'].mean()
+print(f"\nFor Importance of Dr Active Listening, respondents from Cluster 1 scored this at {round(q8_c1_mean, 3)}, on average.")
+print(f"Respondents from Cluster 2 scored this at {round(q8_c2_mean, 3)}, on average.")
+
+~~CODE USED FOR PRINTING OUT THE SUMMARY OF MEAN SCORES FOR EACH QUESTION BY CLUSTER~~
+#print out the summary of the means for each question, by cluster
+summary_dict = {'cluster_1' : [q1_c1_mean, q2_c1_mean, q3_c1_mean, q4_c1_mean, q5_c1_mean, q6_c1_mean, q7_c1_mean, q8_c1_mean], 'cluster_2' : [q1_c2_mean, q2_c2_mean, q3_c2_mean, q4_c2_mean, q5_c2_mean, q6_c2_mean, q7_c2_mean, q8_c2_mean]}
+summary_df = pd.DataFrame(data = summary_dict, index=['Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'Q6', 'Q7', 'Q8'])
+print("A summary of the means for each question, by participant cluster, can be seen here:")
+summary_df
+
+~~CODE USED FOR VISUALIZING THE DISTRIBUTION OF MEAN SCORES FOR EACH QUESTION BY CLUSTER~~
+#create a line graph plotting the distribution of average survey scores per question, by participant cluster
+plt.figure(figsize = [16,5])
+sns.lineplot(data = summary_df, markers=True)
+plt.title("Distribution of Average Survey Scores per Question, by Participant Cluster")
+plt.xlabel("Survey Question Number")
+plt.ylabel("Mean Score");
+
+~~CODE USED TO FIND THE SILHOUETTE SCORE~~
+# define and X (feature columns) and y (resulting cluster labels)
+X = df[["Timely_admis", "Timely_treat", "Timely_visits", 
+                                             "Reliability", "Options", "Hrs_treat", 
+                                             "Courteous", "Active_listen"]]
+y = df['ward_cluster_labels']
+# now that all the visualizations have been made, generate a silhouette score to complete the analysis
+model_score = silhouette_score(X, y, metric='euclidean')
+print(f"The silhouette score of this hierarchical clustering is: {round(model_score, 3)}")
